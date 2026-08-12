@@ -111,11 +111,23 @@ jobs:
       - name: Generate MinIO credentials
         if: matrix.storage.minio_enabled == 'true'
         run: |
-          echo "MINIO_ROOT_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-          echo "MINIO_ACCESS_KEY=$(openssl rand -hex 10)" >> "$GITHUB_ENV"
-          echo "MINIO_SECRET_KEY=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-          echo "MINIO_DUMMY_ACCESS_KEY=$(openssl rand -hex 10)" >> "$GITHUB_ENV"
-          echo "MINIO_DUMMY_SECRET_KEY=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          minio_root_password=$(openssl rand -hex 24)
+          minio_access_key=$(openssl rand -hex 10)
+          minio_secret_key=$(openssl rand -hex 24)
+          minio_dummy_access_key=$(openssl rand -hex 10)
+          minio_dummy_secret_key=$(openssl rand -hex 24)
+
+          echo "::add-mask::$minio_root_password"
+          echo "::add-mask::$minio_access_key"
+          echo "::add-mask::$minio_secret_key"
+          echo "::add-mask::$minio_dummy_access_key"
+          echo "::add-mask::$minio_dummy_secret_key"
+
+          echo "MINIO_ROOT_PASSWORD=$minio_root_password" >> "$GITHUB_ENV"
+          echo "MINIO_ACCESS_KEY=$minio_access_key" >> "$GITHUB_ENV"
+          echo "MINIO_SECRET_KEY=$minio_secret_key" >> "$GITHUB_ENV"
+          echo "MINIO_DUMMY_ACCESS_KEY=$minio_dummy_access_key" >> "$GITHUB_ENV"
+          echo "MINIO_DUMMY_SECRET_KEY=$minio_dummy_secret_key" >> "$GITHUB_ENV"
 
       - name: Configure RDM services
         working-directory: RDM-osf.io
@@ -184,15 +196,12 @@ jobs:
             -p rdm_url "$RDM_URL" \
             -p rdm_api_url "$RDM_API_URL" \
             -p idp_name_1 FakeCAS \
-            -p idp_username_1 "$RDMFS_E2E_USERNAME" \
-            -p idp_password_1 "$RDMFS_E2E_PASSWORD" \
+            -p read_credentials_from_environment true \
             -p rdm_project_name "TEST-RDMFS-${{ matrix.storage.id }}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             -p target_storage_id "${{ matrix.storage.id }}" \
             -p target_storage_name "${{ matrix.storage.display_name }}" \
             -p minio_enabled "${{ matrix.storage.minio_enabled }}" \
             -p minio_service_name 'MinIO (CI)' \
-            -p minio_access_key "$MINIO_ACCESS_KEY" \
-            -p minio_secret_key "$MINIO_SECRET_KEY" \
             -p minio_bucket "$MINIO_BUCKET" \
             -p default_result_path "${GITHUB_WORKSPACE}/e2e-test/result/${{ matrix.storage.id }}" \
             -p transition_timeout 60000 \
