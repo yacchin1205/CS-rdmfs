@@ -1,22 +1,13 @@
 import os
+from collections.abc import AsyncIterable
 
-from osfclient.models.utils import chunked_bytes_iterator, merge_query_params
+from osfclient.models.utils import merge_query_params
 from osfclient.utils import norm_remote_path
 
 
-def _content(fp, size):
-    if size == 0:
-        return b''
-    return chunked_bytes_iterator(fp)
-
-
-def _headers(size):
-    # HTTPX otherwise sends an AsyncIterable with Transfer-Encoding: chunked,
-    # while WaterButler requires Content-Length for file uploads.
-    return {'Content-Length': str(size)}
-
-
-async def create_file(storage, path, fp, size):
+async def create_file(
+    storage, path, content: AsyncIterable[bytes], size: int
+):
     path = norm_remote_path(path)
     directory, filename = os.path.split(path)
 
@@ -29,8 +20,8 @@ async def create_file(storage, path, fp, size):
     response = await parent._put(
         url,
         params=merge_query_params(url, {'name': filename}),
-        headers=_headers(size),
-        content=_content(fp, size),
+        headers={'Content-Length': str(size)},
+        content=content,
     )
     if response.status_code == 409:
         raise FileExistsError(path)
@@ -42,11 +33,11 @@ async def create_file(storage, path, fp, size):
         )
 
 
-async def update_file(file_, fp, size):
+async def update_file(file_, content: AsyncIterable[bytes], size: int):
     response = await file_._put(
         file_._upload_url,
-        headers=_headers(size),
-        content=_content(fp, size),
+        headers={'Content-Length': str(size)},
+        content=content,
     )
     if response.status_code != 200:
         raise RuntimeError(
