@@ -5,6 +5,7 @@ from aiofile import AIOFile, Reader
 import aiofiles
 from osfclient.models import File
 from .inode import BaseInode, NewFile
+from .upload import create_file, update_file
 
 
 log = logging.getLogger(__name__)
@@ -29,9 +30,9 @@ class FileContext:
         self.flags = flags
         self.flush_count = 0
 
-    async def _flush(self, fp):
+    async def _flush(self, fp, size):
         if isinstance(self.inode.object, File):
-            await self.inode.object.update(fp)
+            await update_file(self.inode.object, fp, size)
             return
         storage = self.inode.storage
         if not self.inode.display_path.startswith(storage.display_path):
@@ -42,7 +43,7 @@ class FileContext:
         log.debug('flush: storage={storage}, path={path}'.format(
             storage=storage, path=relative_path
         ))
-        await storage.object.create_file(relative_path, fp)
+        await create_file(storage.object, relative_path, fp, size)
 
     async def _write_to(self, fp):
         if isinstance(self.inode.object, NewFile):
@@ -84,11 +85,10 @@ class FileContext:
         self.bufferfile = None
         if not self.is_write():
             return
+        size = os.path.getsize(self.buffer)
         async with AIOFile(self.buffer, 'rb') as afp:
             reader = Reader(afp, chunk_size=4096)
-            #reader.mode = 'rb'
-            #reader.peek = lambda x=None: True
-            await self._flush(reader)
+            await self._flush(reader, size)
         os.remove(self.buffer)
 
     async def readdir(self, start_id, token):
